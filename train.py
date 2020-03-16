@@ -69,6 +69,7 @@ if not os.path.exists(args.save_folder):
 
 
 def train():
+    ######## load dataset ########
     if args.dataset == 'COCO':
         if args.dataset_root == VOC_ROOT:
             if not os.path.exists(COCO_ROOT):
@@ -88,10 +89,12 @@ def train():
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
 
+    ######## logging by visdom instead of tensorboard ########
     if args.visdom:
         import visdom
         viz = visdom.Visdom()
 
+    ######## form network ########
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
 
@@ -99,6 +102,7 @@ def train():
         net = torch.nn.DataParallel(ssd_net)
         cudnn.benchmark = True
 
+    ######## resume network or not ########
     if args.resume:
         print('Resuming training, loading {}...'.format(args.resume))
         ssd_net.load_weights(args.resume)
@@ -117,6 +121,7 @@ def train():
         ssd_net.loc.apply(weights_init)
         ssd_net.conf.apply(weights_init)
 
+    ############## load loss function and optimizer ####################
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
                           weight_decay=args.weight_decay)
     criterion = MultiBoxLoss(cfg['num_classes'], 0.5, True, 0, True, 3, 0.5,
@@ -142,10 +147,14 @@ def train():
         iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
         epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
 
+    ######## dataloader ########
     data_loader = data.DataLoader(dataset, args.batch_size,
                                   num_workers=args.num_workers,
                                   shuffle=True, collate_fn=detection_collate,
                                   pin_memory=True)
+
+
+    ######## training loop ########
     # create batch iterator
     batch_iterator = iter(data_loader)
     for iteration in range(args.start_iter, cfg['max_iter']):
