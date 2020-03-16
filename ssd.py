@@ -30,8 +30,8 @@ class SSD(nn.Module):
         self.phase = phase
         self.num_classes = num_classes
         self.cfg = (coco, voc)[num_classes == 21]
-        self.priorbox = PriorBox(self.cfg)
-        self.priors = Variable(self.priorbox.forward())
+        self.priorbox = PriorBox(self.cfg)                  #!!! should merge priorbox and priors to a single entity
+        self.priors = Variable(self.priorbox.forward())  
         self.size = size
 
         # SSD network
@@ -95,7 +95,7 @@ class SSD(nn.Module):
 
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
-        if self.phase == "test":
+        if self.phase == "test":                                ######!!! i will move the detection part to the test script and make this SSD class only perform a single behaviour 
             output = self.detect(
                 loc.view(loc.size(0), -1, 4),                   # loc preds
                 self.softmax(conf.view(conf.size(0), -1,
@@ -139,14 +139,14 @@ def vgg(cfg, i, batch_norm=False):
                 layers += [conv2d, nn.ReLU(inplace=True)]
             in_channels = v
     pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-    conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)
-    conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
+    conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)  
+    conv7 = nn.Conv2d(1024, 1024, kernel_size=1)                        
     layers += [pool5, conv6,
                nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
     return layers
 
 
-def add_extras(cfg, i, batch_norm=False):
+def add_extras(cfg, i, batch_norm=False): # the extra layers as stated in SSD paper
     # Extra layers added to VGG for feature scaling
     layers = []
     in_channels = i
@@ -167,19 +167,20 @@ def multibox(vgg, extra_layers, cfg, num_classes):
     loc_layers = []
     conf_layers = []
     vgg_source = [21, -2]
-    for k, v in enumerate(vgg_source):
+    for k, v in enumerate(vgg_source): # vgg layers element number 21 and the second last
         loc_layers += [nn.Conv2d(vgg[v].out_channels,
-                                 cfg[k] * 4, kernel_size=3, padding=1)]
-        conf_layers += [nn.Conv2d(vgg[v].out_channels,
+         cfg[k] * 4, kernel_size=3, padding=1)]
+        conf_layers += [nn.Conv2d(vgg[v].out_channels,                        
                         cfg[k] * num_classes, kernel_size=3, padding=1)]
-    for k, v in enumerate(extra_layers[1::2], 2):
+    for k, v in enumerate(extra_layers[1::2], 2): # form a new list start from 1 with slice step 2. Start at 2 of this new list
         loc_layers += [nn.Conv2d(v.out_channels, cfg[k]
                                  * 4, kernel_size=3, padding=1)]
         conf_layers += [nn.Conv2d(v.out_channels, cfg[k]
                                   * num_classes, kernel_size=3, padding=1)]
     return vgg, extra_layers, (loc_layers, conf_layers)
 
-
+##### It seems that these parameters can be changed. But in fact they cannot as they are highly coupled to the func vgg, add_extra and multi_box and also the ssd class
+#####!!! I believe a flattened network will be an easier read
 base = {
     '300': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'C', 512, 512, 512, 'M',
             512, 512, 512],

@@ -21,7 +21,7 @@ def demo():
         net.load_weights('./weights/ssd300_mAP_77.43_v2.pth')
 
     ##### Load image #####
-    image = cv2.imread('./data/dog.jpg', cv2.IMREAD_COLOR)  # uncomment if dataset not downloaded
+    image = cv2.imread('./data/dog.jpg', cv2.IMREAD_COLOR)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # View the sampled input image before transform
     plt.figure(figsize=(10,10))
@@ -42,20 +42,21 @@ def demo():
     if torch.cuda.is_available():
         xx = xx.cuda()
     y = net(xx)
-
+    print('y = ', y.shape)
     ##### Parse the Detections and View Results #####
     detections = y.data
+    print('detections = ', detections.shape)
 
     plt.figure(figsize=(10,10))
     colors = plt.cm.hsv(np.linspace(0, 1, 21)).tolist()
     plt.imshow(rgb_image)  # plot the image for matplotlib
-
     currentAxis = plt.gca()
 
     # scale each detection back up to the image
     scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
     for i in range(detections.size(1)):
         j = 0
+        score = detections[0,i,j,0]
         while detections[0,i,j,0] >= 0.6:
             score = detections[0,i,j,0]
             display_txt = '{}'.format(score)

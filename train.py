@@ -80,7 +80,7 @@ def train():
         cfg = coco
         dataset = COCODetection(root=args.dataset_root,
                                 transform=SSDAugmentation(cfg['min_dim'],
-                                                          MEANS))
+                                                          MEANS))   # !!!put this MEANS into SSDAugmentation too
     elif args.dataset == 'VOC':
         if args.dataset_root == COCO_ROOT:
             parser.error('Must specify dataset if specifying dataset_root')
