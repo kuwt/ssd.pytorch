@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 import cv2
 import numpy as np
 
-COCO_ROOT = osp.join('E:/storage/kuwingto/code/ssd.pytorch/data','')
+COCO_ROOT = osp.join('/srv/storage/kuwingto/code/ssd.pytorch/data','')
 IMAGES = 'images'
 ANNOTATIONS = 'annotations'
 COCO_API = 'PythonAPI'

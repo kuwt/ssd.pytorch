@@ -8,17 +8,30 @@ from torch.autograd import Variable
 import numpy as np
 import cv2
 
-if torch.cuda.is_available():
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
 
 from matplotlib import pyplot as plt
 from ssd import build_ssd
 
+#####
+
+use_cuda = 0
+
+#####
+
+
+
 def demo():
+
+    if use_cuda:
+        if torch.cuda.is_available():
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
     ##### Build SSD300 in Test Phase #####
     with torch.no_grad():
         net = build_ssd('test', 300, 21)    # initialize SSD
         net.load_weights('./weights/ssd300_mAP_77.43_v2.pth')
+        net.eval()
 
     ##### Load image #####
     image = cv2.imread('./data/dog.jpg', cv2.IMREAD_COLOR)
@@ -39,8 +52,10 @@ def demo():
 
     ##### SSD Forward Pass #####
     xx = Variable(x.unsqueeze(0))     # add dimension to x to match network input, wrap tensor in Variable
-    if torch.cuda.is_available():
-        xx = xx.cuda()
+    
+    if use_cuda:
+        if torch.cuda.is_available():
+            xx = xx.cuda()
     y = net(xx)
     print('y = ', y.shape)
     ##### Parse the Detections and View Results #####
@@ -54,10 +69,10 @@ def demo():
 
     # scale each detection back up to the image
     scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
-    for i in range(detections.size(1)):
+    for i in range(detections.size(1)):   # i is the class label
         j = 0
-        score = detections[0,i,j,0]
-        while detections[0,i,j,0] >= 0.6:
+        score = detections[0,i,j,0]     #detections is of size 1 x classNumber x topk x 5,  5 corresponding to score, bbox pt coordinate
+        while detections[0,i,j,0] >= 0.6:   # for each class, print the topk detection until the score drops below 0.6
             score = detections[0,i,j,0]
             display_txt = '{}'.format(score)
             pt = (detections[0,i,j,1:]*scale).cpu().numpy()
@@ -68,6 +83,7 @@ def demo():
             j+=1
 
     plt.show()
+    plt.savefig('result.png')
 
 if __name__ == '__main__':
     demo()

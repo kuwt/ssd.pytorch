@@ -7,6 +7,12 @@ from data import voc, coco
 import os
 
 
+#############################
+# The behaviour of SSD
+# is different during train or test is different.
+# At least the output is different.
+#########################
+
 class SSD(nn.Module):
     """Single Shot Multibox Architecture
     The network is composed of a base VGG network followed by the
