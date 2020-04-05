@@ -14,6 +14,7 @@ use_cuda = 0
 import config
 CFG = config.voc
 PREPROCESS_MEAN = (104.0, 117.0, 123.0) 
+NN_inputSize = 300
 
 #####
 def demo(cfg, imgPath = './data/dog.jpg' , checkpt = './weights/ssd300_mAP_77.43_v2.pth'):
@@ -23,7 +24,7 @@ def demo(cfg, imgPath = './data/dog.jpg' , checkpt = './weights/ssd300_mAP_77.43
 
     ##### Build SSD300 in Test Phase #####
     with torch.no_grad():
-        net = build_ssd(cfg, 'test', 300, cfg['num_classes'])    # initialize SSD
+        net = build_ssd(cfg, 'test', NN_inputSize, cfg['num_classes'])    # initialize SSD
         net.load_weights(checkpt)
         net.eval()
 
@@ -36,7 +37,7 @@ def demo(cfg, imgPath = './data/dog.jpg' , checkpt = './weights/ssd300_mAP_77.43
     plt.show()
 
     ##### Pre-process the input #####
-    x = cv2.resize(image, (300, 300)).astype(np.float32)
+    x = cv2.resize(image, (NN_inputSize, NN_inputSize)).astype(np.float32)
     x -= PREPROCESS_MEAN   #subtract mean of the dataset as in the training phase
     x = x.astype(np.float32)
     x = x[:, :, ::-1].copy()
