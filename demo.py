@@ -1,40 +1,34 @@
 import os
 import sys
-
+import numpy as np
+import cv2
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-import numpy as np
-import cv2
-
-
-
 from matplotlib import pyplot as plt
 from ssd import build_ssd
 
 #####
-
 use_cuda = 0
+import config
+CFG = config.voc
+PREPROCESS_MEAN = (104.0, 117.0, 123.0) 
 
 #####
-
-
-
-def demo():
-
+def demo(cfg, imgPath = './data/dog.jpg' , checkpt = './weights/ssd300_mAP_77.43_v2.pth'):
     if use_cuda:
         if torch.cuda.is_available():
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
     ##### Build SSD300 in Test Phase #####
     with torch.no_grad():
-        net = build_ssd('test', 300, 21)    # initialize SSD
-        net.load_weights('./weights/ssd300_mAP_77.43_v2.pth')
+        net = build_ssd(cfg, 'test', 300, cfg['num_classes'])    # initialize SSD
+        net.load_weights(checkpt)
         net.eval()
 
     ##### Load image #####
-    image = cv2.imread('./data/dog.jpg', cv2.IMREAD_COLOR)
+    image = cv2.imread(imgPath, cv2.IMREAD_COLOR)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # View the sampled input image before transform
     plt.figure(figsize=(10,10))
@@ -43,7 +37,7 @@ def demo():
 
     ##### Pre-process the input #####
     x = cv2.resize(image, (300, 300)).astype(np.float32)
-    x -= (104.0, 117.0, 123.0)
+    x -= PREPROCESS_MEAN   #subtract mean of the dataset as in the training phase
     x = x.astype(np.float32)
     x = x[:, :, ::-1].copy()
     plt.imshow(x)
@@ -86,4 +80,4 @@ def demo():
     plt.savefig('result.png')
 
 if __name__ == '__main__':
-    demo()
+    demo(CFG)

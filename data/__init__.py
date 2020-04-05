@@ -1,10 +1,7 @@
-from .voc0712 import VOCDetection, VOCAnnotationTransform, VOC_CLASSES, VOC_ROOT
-
-from .coco import COCODetection, COCOAnnotationTransform, COCO_CLASSES, COCO_ROOT, get_label_map
-from .config import *
 import torch
 import cv2
 import numpy as np
+from .config import *
 
 def detection_collate(batch):
     """Custom collate fn for dealing with batches of images that have a different
