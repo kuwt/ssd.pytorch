@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from matplotlib import pyplot as plt
+
 from ssd import build_ssd
 
 #####
@@ -15,8 +16,8 @@ import config
 CFG = config.voc
 PREPROCESS_MEAN = (104.0, 117.0, 123.0) 
 NN_inputSize = 300
-
 #####
+
 def demo(cfg, imgPath = './data/dog.jpg' , checkpt = './weights/ssd300_mAP_77.43_v2.pth'):
     if use_cuda:
         if torch.cuda.is_available():
