@@ -11,6 +11,7 @@ import torch.nn.init as init
 import torch.utils.data as data
 import numpy as np
 import argparse
+import pprint
 
 from data import *
 from utils.augmentations import SSDAugmentation
@@ -27,7 +28,7 @@ parser = argparse.ArgumentParser( description='Single Shot MultiBox Detector Tra
 train_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth', #config
                     help='Pretrained base model')
-parser.add_argument('--batch_size', default=32, type=int,       #config
+parser.add_argument('--batch_size', default=1, type=int,       #config
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -57,6 +58,9 @@ NN_inputSize = 300
 #####
 
 def train():
+    ######## config ########
+    cfg =  config.custom
+    pprint.pprint(cfg)
 
     ######## cuda ########
     if torch.cuda.is_available():
@@ -74,10 +78,8 @@ def train():
         os.mkdir(args.save_folder)
 
     ######## load dataset ########
-    cfg =  config.custom
     dataset = CustomDetection( transform=SSDAugmentation(cfg['min_dim'],
                                                          PREPROCESS_MEAN))
-
     ######## logging by visdom instead of tensorboard ########
     if args.visdom:
         import visdom
@@ -125,8 +127,6 @@ def train():
 
     epoch_size = len(dataset) // args.batch_size
     print('Training SSD on:', dataset.name)
-    print('Using the specified args:')
-    print(args)
 
     step_index = 0
 
@@ -146,6 +146,7 @@ def train():
     ######## training loop ########
     # create batch iterator
     batch_iterator = iter(data_loader)
+    print(" Dataset size = " , len(batch_iterator))
     for iteration in range(args.start_iter, cfg['max_iter']):
         if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
             update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
@@ -160,14 +161,17 @@ def train():
             adjust_learning_rate(optimizer, args.gamma, step_index)
 
         # load train data
-        images, targets = next(batch_iterator)
+        try:
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            print("No data left. Repeat from start")
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
 
         if args.cuda:
-            images = Variable(images.cuda())
-            targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
-        else:
-            images = Variable(images)
-            targets = [Variable(ann, volatile=True) for ann in targets]
+            images = images.cuda()
+            targets = targets.cuda()
+
         # forward
         t0 = time.time()
         out = net(images)
@@ -178,15 +182,13 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        loc_loss += loss_l.data
+        conf_loss += loss_c.data
 
-        if iteration % 10 == 0:
-            print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
+        print('iter {}  || Loss: {} || timer {} sec'.format(iteration,loss.data,(t1 - t0)) )
 
         if args.visdom:
-            update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
+            update_vis_plot(iteration, loss_l.data, loss_c.data,
                             iter_plot, epoch_plot, 'append')
 
         if iteration != 0 and iteration % 5000 == 0:
@@ -209,7 +211,7 @@ def adjust_learning_rate(optimizer, gamma, step):
 
 
 def xavier(param):
-    init.xavier_uniform(param)
+    init.xavier_uniform_(param)
 
 
 def weights_init(m):

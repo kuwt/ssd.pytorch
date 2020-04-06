@@ -1,6 +1,6 @@
 to do list: 
 1. add demo.py (done) 
-2. customize dataset
+2. customize dataset (done)
 3. refactoring
 4. add validation curve
 5. tidy up evaluation 
