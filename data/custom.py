@@ -6,6 +6,10 @@ import torch.utils.data as data
 import cv2
 import numpy as np
 import json
+import imgaug as ia
+import imgaug.augmenters as iaa
+from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
+
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
@@ -13,33 +17,6 @@ else:
 
 THE_CLASSES = ('box', )
 DATA_ROOT = '/srv/data/kuwingto/SAEcustomData20200224/obj1_bbox'
-
-class CustomAnnotationTransform(object):
-
-    def __init__(self):
-        self.class_to_ind = dict(zip(THE_CLASSES, range(len(THE_CLASSES))))
-    
-    def __call__(self, target, width, height):
-
-        res = []
-        for obj in target['shapes']:
-            name = obj['label']
-            x = [obj['points'][0][0] / width, obj['points'][1][0] / width]
-            y = [obj['points'][0][1] / height, obj['points'][1][1] / height]
-
-            bndbox = []
-            bndbox.append(min(x))
-            bndbox.append(min(y))
-            bndbox.append(max(x))
-            bndbox.append(max(y))
-
-            label_idx = self.class_to_ind[name]
-            bndbox.append(label_idx)
-            res += [bndbox]  # [xmin, ymin, xmax, ymax, label_ind]
-            # img_id = target.find('filename').text[:-4]
-
-        return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
-
 
 def transverseImageAnnoDirectory(root, img_ext = ".bmp", anno_ext = ".json"):
     """
@@ -72,17 +49,14 @@ class CustomDetection(data.Dataset):
     def __init__(self, 
                 cfg,
                 root = DATA_ROOT,
-                transform=None,
-                target_transform=CustomAnnotationTransform(),
                 dataset_name='custom'):
 
         self.root = root
-        self.transform = transform
-        self.target_transform = target_transform
         self.name = dataset_name
         self.input_res = cfg['min_dim']
+        self.class_to_ind = dict(zip(THE_CLASSES, range(len(THE_CLASSES))))
         self._imgpaths, self._annopaths = transverseImageAnnoDirectory(self.root, ".bmp", ".json")
-
+    
         print("show 5 samples")
         for i in range(5):
             print("imagePath = " ,self._imgpaths[i])
@@ -102,29 +76,73 @@ class CustomDetection(data.Dataset):
         #print("img_path = ", img_path)
         #print("anno_path = ", anno_path)
         
-        annofile = open(anno_path, 'r')
-        target = json.load(annofile)
-        
+        ##### read files #####
         img = cv2.imread(img_path)
-
-
         height, width, channels = img.shape
 
-        if self.target_transform is not None: #get normalized annotation
-            target = self.target_transform(target, width, height)
+        annofile = open(anno_path, 'r')
+        jsonanno = json.load(annofile)
 
-        if self.transform is not None:  #augmentation
-            target = np.array(target)
-            img, boxes, labels = self.transform(img, target[:, :4], target[:, 4])
-            # to rgb
-            img = img[:, :, (2, 1, 0)]
-            target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
-        else:
-            img = img.astype('float32') 
-            img =  cv2.resize(img, (self.input_res, self.input_res), interpolation = cv2.INTER_AREA)
+        ##### read files #####
+        targets = [] 
+        for obj in jsonanno['shapes']:
+            name = obj['label']
+            x = [obj['points'][0][0], obj['points'][1][0]]
+            y = [obj['points'][0][1], obj['points'][1][1]]
 
-        #print("b = ", target)
-        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
+            bndbox = []
+            bndbox.append(min(x))
+            bndbox.append(min(y))
+            bndbox.append(max(x))
+            bndbox.append(max(y))
+
+            label_idx = self.class_to_ind[name]
+            bndbox.append(label_idx)    # [xmin, ymin, xmax, ymax, label_ind]
+            targets += [bndbox]  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
+
+        ##### resize to map input resolution of the network#####
+        img =  cv2.resize(img, (self.input_res, self.input_res), interpolation = cv2.INTER_AREA)
+        
+        factor_x = float(self.input_res) / float(width)
+        factor_y = float(self.input_res) / float(height)
+        for t in targets:
+            t[0] = factor_x * t[0]
+            t[2] = factor_x * t[2]
+            t[1] = factor_y * t[1]
+            t[3] = factor_y * t[3]
+        
+        ##### augmentation #####
+        bbs = []
+        for t in targets:
+            bbs.append(BoundingBox(x1=t[0], y1=t[1], x2= t[2], y2=t[3]))
+        bbs_oi = BoundingBoxesOnImage(bbs, shape=img.shape)
+
+        seq = iaa.Sequential([
+            iaa.Multiply((0.8, 1.1)), # change brightness, doesn't affect keypoints
+            iaa.AdditiveGaussianNoise(0,5),
+            iaa.Affine(
+                scale=(0.9,1),
+                rotate=(-5,5)
+            )
+        ])
+        image_aug, bbs_aug = seq(image=img, bounding_boxes=bbs_oi)
+        for i in range(len(bbs_oi.bounding_boxes)):
+            after = bbs_aug.bounding_boxes[i]
+            targets[i][0] =  after.x1
+            targets[i][1] =  after.y1
+            targets[i][2] =  after.x2
+            targets[i][3] =  after.y2
+        img = image_aug
+
+        ##### treatment for SSD multibox #####
+        for t in targets:
+            t[0] = float(t[0]) /float(width)
+            t[1] = float(t[1]) / float(height)
+            t[2] = float(t[2]) / float(width)
+            t[3] = float(t[3]) / float(height)
+        img = img.astype('float32') 
+
+        return torch.from_numpy(img).permute(2, 0, 1), targets, height, width
 
 
 

@@ -14,7 +14,6 @@ import argparse
 import pprint
 
 from data import *
-from utils.augmentations import SSDAugmentation
 from layers.modules import MultiBoxLoss
 from ssd import build_ssd
 import config
@@ -78,8 +77,7 @@ def train():
         os.mkdir(args.save_folder)
 
     ######## load dataset ########
-    dataset = CustomDetection(  cfg = cfg, 
-                                transform=SSDAugmentation(cfg['min_dim'],PREPROCESS_MEAN))
+    dataset = CustomDetection(  cfg = cfg)
     ######## logging by visdom instead of tensorboard ########
     if args.visdom:
         import visdom
