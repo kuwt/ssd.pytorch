@@ -49,37 +49,56 @@ class MultiBoxLoss(nn.Module):
         Args:
             predictions (tuple): A tuple containing loc preds, conf preds,
             and prior boxes from SSD net.
-                conf shape: torch.size(batch_size,num_priors,num_classes)
                 loc shape: torch.size(batch_size,num_priors,4)
+                conf shape: torch.size(batch_size,num_priors,num_classes)
                 priors shape: torch.size(num_priors,4)
 
-            targets (tensor): Ground truth boxes and labels for a batch,
-                shape: [batch_size,num_objs,5] (last idx is the label).
+            targets (list(batch size dimension) of tensor): Ground truth boxes and labels for a batch,
+               tenor of shape  [num_objs,5] (last idx of the 5 is the label).
         """
         loc_data, conf_data, priors = predictions
-        num = loc_data.size(0)
-        priors = priors[:loc_data.size(1), :]
+        num = loc_data.size(0)  # batch size
+        #print("num = {}".format(num))
+        priors = priors[:loc_data.size(1), :] #clip priors according to the real prediction box size. No need to clip normally.
         num_priors = (priors.size(0))
         num_classes = self.num_classes
+
+        #
+        # generate positive data from ground truth and default boxes 
+        # 
 
         # match priors (default boxes) and ground truth boxes
         loc_t = torch.Tensor(num, num_priors, 4)
         conf_t = torch.LongTensor(num, num_priors)
-        for idx in range(num):
-            truths = targets[idx][:, :-1].data
-            labels = targets[idx][:, -1].data
-            defaults = priors.data
-            match(self.threshold, truths, defaults, self.variance, labels,
-                  loc_t, conf_t, idx)
+
+        for idx in range(num): # for each image of a batch
+            truths = targets[idx][:, :-1]
+            labels = targets[idx][:, -1]
+            defaults = priors
+            #print("truths = {}".format(truths))
+            #print("labels = {}".format(labels))
+            #print("defaults = {}".format(defaults))
+            #print("self.variance = {}".format(self.variance))
+
+            match(  self.threshold, 
+                    truths, 
+                    defaults, 
+                    self.variance, 
+                    labels,
+                    loc_t, 
+                    conf_t,
+                    idx) 
         if self.use_gpu:
             loc_t = loc_t.cuda()
             conf_t = conf_t.cuda()
-        # wrap targets
-        loc_t = Variable(loc_t, requires_grad=False)
-        conf_t = Variable(conf_t, requires_grad=False)
+        
+        pos = conf_t > 0  # Here 0 is the background class, custom class starts from 1
+        num_pos = pos.sum(dim=1, keepdim=True)  # number of positive boxes
 
-        pos = conf_t > 0
-        num_pos = pos.sum(dim=1, keepdim=True)
+        if num_pos == 0:  # if no positive box, set the loss to 0 as in the paper.
+            loss_l = 0.0
+            loss_c = 0.0
+            return loss_l, loss_c
 
         # Localization Loss (Smooth L1)
         # Shape: [batch,num_priors,4]

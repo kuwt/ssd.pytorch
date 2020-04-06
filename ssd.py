@@ -36,7 +36,7 @@ class SSD(nn.Module):
         self.num_classes = num_classes
         self.cfg = cfg
         self.priorbox = PriorBox(self.cfg)                  #!!! should merge priorbox and priors to a single entity
-        self.priors = Variable(self.priorbox.forward())  
+        self.priors = self.priorbox.forward()
         self.size = size
 
         # SSD network
@@ -67,8 +67,8 @@ class SSD(nn.Module):
 
             train:
                 list of concat outputs from:
-                    1: confidence layers, Shape: [batch*num_priors,num_classes]
-                    2: localization layers, Shape: [batch,num_priors*4]
+                    1: localization layers, Shape: [batch,num_priors*4]
+                    2: confidence layers, Shape: [batch*num_priors,num_classes]
                     3: priorbox layers, Shape: [2,num_priors*4]
         """
         sources = list()

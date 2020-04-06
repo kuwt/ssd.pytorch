@@ -34,7 +34,7 @@ parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,        
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=4, type=int,       #config
+parser.add_argument('--num_workers', default=0, type=int,       #config
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=False, type=str2bool,
                     help='Use CUDA to train model')
@@ -78,8 +78,8 @@ def train():
         os.mkdir(args.save_folder)
 
     ######## load dataset ########
-    dataset = CustomDetection( transform=SSDAugmentation(cfg['min_dim'],
-                                                         PREPROCESS_MEAN))
+    dataset = CustomDetection(  cfg = cfg, 
+                                transform=SSDAugmentation(cfg['min_dim'],PREPROCESS_MEAN))
     ######## logging by visdom instead of tensorboard ########
     if args.visdom:
         import visdom
@@ -120,8 +120,6 @@ def train():
                              False, args.cuda)
 
     # loss counters
-    loc_loss = 0
-    conf_loss = 0
     epoch = 0
     print('Loading the dataset...')
 
@@ -152,8 +150,6 @@ def train():
             update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
                             'append', epoch_size)
             # reset epoch loss counters
-            loc_loss = 0
-            conf_loss = 0
             epoch += 1
 
         if iteration in cfg['lr_steps']:
@@ -170,11 +166,30 @@ def train():
 
         if args.cuda:
             images = images.cuda()
-            targets = targets.cuda()
+            targets = [t.cuda() for t in targets] # from a list of tensors to a list of tensor cuda 
+
+        #
+        isDetailLog = True
+        if isDetailLog:
+           # print("images = {}".format(images.type()))
+           # print("targets[0] = {}".format(targets[0].type()))
+
+            img = images[0].cpu().numpy().transpose(1, 2, 0)
+           # print("img = {}".format(img.shape))
+            path = './log/srcimg_{}.bmp'.format(iteration)
+            cv2.imwrite(path,img)
+
+            path = './log/target_{}.txt'.format(iteration)
+            with open(path,'w') as f:
+                for t in targets:
+                    savetarget = t.cpu().detach().numpy()
+                    np.savetxt(f, savetarget, fmt='%.2f')
 
         # forward
         t0 = time.time()
         out = net(images)
+        #print("out = {} {} {}".format(out[0].size(), out[1].size(), out[2].size()))
+
         # backprop
         optimizer.zero_grad()
         loss_l, loss_c = criterion(out, targets)
@@ -182,13 +197,11 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data
-        conf_loss += loss_c.data
 
-        print('iter {}  || Loss: {} || timer {} sec'.format(iteration,loss.data,(t1 - t0)) )
-
+        print('iter {}  || Loss: {} || loss_l = {}, loss_c = {} || timer {} sec'.format(iteration,loss,loss_l,loss_c,(t1 - t0)) )
+        #raise NameError('raise error to debug first iteration')
         if args.visdom:
-            update_vis_plot(iteration, loss_l.data, loss_c.data,
+            update_vis_plot(iteration, loss_l, loss_c,
                             iter_plot, epoch_plot, 'append')
 
         if iteration != 0 and iteration % 5000 == 0:

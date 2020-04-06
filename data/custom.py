@@ -69,13 +69,18 @@ def transverseImageAnnoDirectory(root, img_ext = ".bmp", anno_ext = ".json"):
     return image_paths, annotations_paths
 
 class CustomDetection(data.Dataset):
-    def __init__(self, root = DATA_ROOT,  transform=None,
-                target_transform=CustomAnnotationTransform(), dataset_name='custom'):
+    def __init__(self, 
+                cfg,
+                root = DATA_ROOT,
+                transform=None,
+                target_transform=CustomAnnotationTransform(),
+                dataset_name='custom'):
+
         self.root = root
         self.transform = transform
         self.target_transform = target_transform
         self.name = dataset_name
-        
+        self.input_res = cfg['min_dim']
         self._imgpaths, self._annopaths = transverseImageAnnoDirectory(self.root, ".bmp", ".json")
 
         print("show 5 samples")
@@ -94,24 +99,31 @@ class CustomDetection(data.Dataset):
     def pull_item(self, index):
         img_path = self._imgpaths[index]
         anno_path = self._annopaths[index]
-
-
+        #print("img_path = ", img_path)
+        #print("anno_path = ", anno_path)
+        
         annofile = open(anno_path, 'r')
         target = json.load(annofile)
         
         img = cv2.imread(img_path)
+
+
         height, width, channels = img.shape
 
-        if self.target_transform is not None:
+        if self.target_transform is not None: #get normalized annotation
             target = self.target_transform(target, width, height)
 
-        if self.transform is not None:
+        if self.transform is not None:  #augmentation
             target = np.array(target)
             img, boxes, labels = self.transform(img, target[:, :4], target[:, 4])
             # to rgb
             img = img[:, :, (2, 1, 0)]
-            # img = img.transpose(2, 0, 1)
             target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+        else:
+            img = img.astype('float32') 
+            img =  cv2.resize(img, (self.input_res, self.input_res), interpolation = cv2.INTER_AREA)
+
+        #print("b = ", target)
         return torch.from_numpy(img).permute(2, 0, 1), target, height, width
 
 
