@@ -10,7 +10,7 @@ initial_lr: 0.0001
 momentum: 0.9
 weight_decay: 0.0005
 gamma: 0.1
-PREPROCESS_MEAN : [0,0,0]
+PREPROCESS_MEAN : [104.0, 117.0, 123.0]
 
 ### network architecture ####
 num_classes: 21      
