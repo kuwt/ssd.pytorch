@@ -146,6 +146,8 @@ def train():
     batch_iterator = iter(data_loader)
     print(" epoch_size = " , epoch_size)
     print(" Dataset size = " , len(batch_iterator))
+
+    checkpt_save_iter = cfg['checkpt_save_iter']
     for iteration in range(args.start_iter, cfg['max_iter']):
         if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
             update_vis_plot(viz, epoch,  loc_loss, conf_loss,epoch_plot, 'append', epoch_size)
@@ -206,12 +208,13 @@ def train():
         if args.visdom:
             update_vis_plot(viz,iteration, loss_l, loss_c, iter_plot, 'append')
 
-        if iteration != 0 and iteration % 5000 == 0:
+        if iteration != 0 and iteration % checkpt_save_iter == 0:
             print('Saving state, iter:', iteration)
-            torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
-                       repr(iteration) + '.pth')
-    torch.save(ssd_net.state_dict(),
-               args.save_folder + '' + args.dataset + '.pth')
+            path = '{}/{}_{}.pth'.format(args.save_folder,cfg['name'],repr(iteration))
+            torch.save(ssd_net.state_dict(), path)
+
+    path = '{}/{}_end.pth'.format(args.save_folder,cfg['name'])
+    torch.save(ssd_net.state_dict(),  path)
 
 ######## ###################
 # 
