@@ -95,11 +95,6 @@ class MultiBoxLoss(nn.Module):
         pos = conf_t > 0  # Here 0 is the background class, custom class starts from 1
         num_pos = pos.sum(dim=1, keepdim=True)  # number of positive boxes
 
-        if num_pos == 0:  # if no positive box, set the loss to 0 as in the paper.
-            loss_l = 0.0
-            loss_c = 0.0
-            return loss_l, loss_c
-
         # Localization Loss (Smooth L1)
         # Shape: [batch,num_priors,4]
         pos_idx = pos.unsqueeze(pos.dim()).expand_as(loc_data)
@@ -130,6 +125,11 @@ class MultiBoxLoss(nn.Module):
         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
 
         N = num_pos.data.sum()
-        loss_l /= N.float()
-        loss_c /= N.float()
+
+        if N == 0:  # if no positive box, set the loss to 0 as in the paper.
+            loss_l = 0.0
+            loss_c = 0.0
+        else:   
+            loss_l /= N.float()
+            loss_c /= N.float()
         return loss_l, loss_c
