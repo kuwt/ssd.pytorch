@@ -37,7 +37,7 @@ parser.add_argument('--num_workers', default=0, type=int,       #config
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=False, type=str2bool,
                     help='Use CUDA to train model')
-parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float,    #config
+parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,    #config
                     help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float,                   #config  
                     help='Momentum value for optim')
@@ -167,7 +167,7 @@ def train():
             targets = [t.cuda() for t in targets] # from a list of tensors to a list of tensor cuda 
 
         #
-        isDetailLog = True
+        isDetailLog = False
         if isDetailLog:
            # print("images = {}".format(images.type()))
            # print("targets[0] = {}".format(targets[0].type()))
