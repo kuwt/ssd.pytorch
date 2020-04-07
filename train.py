@@ -54,6 +54,7 @@ args = parser.parse_args()
 #####
 PREPROCESS_MEAN = (104.0, 117.0, 123.0) 
 NN_inputSize = 300
+isDetailLog = False
 #####
 
 def train():
@@ -80,6 +81,7 @@ def train():
     dataset = CustomDetection(  cfg = cfg)
     ######## logging by visdom instead of tensorboard ########
     if args.visdom:
+        print("visdom")
         import visdom
         viz = visdom.Visdom()
 
@@ -119,6 +121,9 @@ def train():
 
     # loss counters
     epoch = 0
+    loc_loss = 0
+    conf_loss = 0
+
     print('Loading the dataset...')
 
     epoch_size = len(dataset) // args.batch_size
@@ -129,8 +134,8 @@ def train():
     if args.visdom:
         vis_title = 'SSD.PyTorch on ' + dataset.name
         vis_legend = ['Loc Loss', 'Conf Loss', 'Total Loss']
-        iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
-        epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
+        iter_plot = create_vis_plot(viz,'Iteration', 'Loss', vis_title, vis_legend)
+        epoch_plot = create_vis_plot(viz,'Epoch', 'Loss', vis_title, vis_legend)
 
     ######## dataloader ########
     data_loader = data.DataLoader(dataset, args.batch_size,
@@ -142,12 +147,14 @@ def train():
     ######## training loop ########
     # create batch iterator
     batch_iterator = iter(data_loader)
+    print(" epoch_size = " , epoch_size)
     print(" Dataset size = " , len(batch_iterator))
     for iteration in range(args.start_iter, cfg['max_iter']):
         if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
-            update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
-                            'append', epoch_size)
+            update_vis_plot(viz, epoch,  loc_loss, conf_loss,epoch_plot, 'append', epoch_size)
             # reset epoch loss counters
+            loc_loss = 0
+            conf_loss = 0
             epoch += 1
 
         if iteration in cfg['lr_steps']:
@@ -166,8 +173,6 @@ def train():
             images = images.cuda()
             targets = [t.cuda() for t in targets] # from a list of tensors to a list of tensor cuda 
 
-        #
-        isDetailLog = False
         if isDetailLog:
            # print("images = {}".format(images.type()))
            # print("targets[0] = {}".format(targets[0].type()))
@@ -196,11 +201,13 @@ def train():
         optimizer.step()
         t1 = time.time()
 
-        print('iter {}  || Loss: {} || loss_l = {}, loss_c = {} || timer {} sec'.format(iteration,loss,loss_l,loss_c,(t1 - t0)) )
+        loc_loss += loss_l
+        conf_loss += loss_c
+
+        print('epoch {} || iter {}  || Loss: {} || loss_l = {}, loss_c = {} || timer {} sec'.format(epoch, iteration,loss,loss_l,loss_c,(t1 - t0)) )
         #raise NameError('raise error to debug first iteration')
         if args.visdom:
-            update_vis_plot(iteration, loss_l, loss_c,
-                            iter_plot, epoch_plot, 'append')
+            update_vis_plot(viz,iteration, loss_l, loss_c, iter_plot, 'append')
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
@@ -231,7 +238,7 @@ def weights_init(m):
         m.bias.data.zero_()
 
 
-def create_vis_plot(_xlabel, _ylabel, _title, _legend):
+def create_vis_plot(viz, _xlabel, _ylabel, _title, _legend):
     return viz.line(
         X=torch.zeros((1,)).cpu(),
         Y=torch.zeros((1, 3)).cpu(),
@@ -243,24 +250,15 @@ def create_vis_plot(_xlabel, _ylabel, _title, _legend):
         )
     )
 
-
-def update_vis_plot(iteration, loc, conf, window1, window2, update_type,
-                    epoch_size=1):
-    viz.line(
-        X=torch.ones((1, 3)).cpu() * iteration,
-        Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu() / epoch_size,
-        win=window1,
-        update=update_type
-    )
-    # initialize epoch plot on first iteration
-    if iteration == 0:
+def update_vis_plot(viz, iteration, loc, conf, window, update_type, average_size=1):
+    if window is not None:
         viz.line(
-            X=torch.zeros((1, 3)).cpu(),
-            Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu(),
-            win=window2,
-            update=True
+            X=torch.ones((1, 3)).cpu() * iteration,
+            Y=torch.Tensor([loc, conf, loc + conf]).unsqueeze(0).cpu() / average_size,
+            win=window,
+            update=update_type
         )
-
+        
 
 if __name__ == '__main__':
     train()
