@@ -12,55 +12,48 @@ import torch.utils.data as data
 import numpy as np
 import argparse
 import pprint
+import yaml
 
 from data import *
 from layers.modules import MultiBoxLoss
 from ssd import build_ssd
-import config
 from data.custom import CustomDetection
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
+######## ###################
+# 
+# argument parser
+# 
+#  ############################
 parser = argparse.ArgumentParser( description='Single Shot MultiBox Detector Training With Pytorch')
 
 train_set = parser.add_mutually_exclusive_group()
-parser.add_argument('--basenet', default='vgg16_reducedfc.pth', #config
-                    help='Pretrained base model')
-parser.add_argument('--batch_size', default=1, type=int,       #config
-                    help='Batch size for training')
+
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,        
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=0, type=int,       #config
-                    help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=False, type=str2bool,
                     help='Use CUDA to train model')
-parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,    #config
-                    help='initial learning rate')
-parser.add_argument('--momentum', default=0.9, type=float,                   #config  
-                    help='Momentum value for optim')
-parser.add_argument('--weight_decay', default=5e-4, type=float,              #config
-                    help='Weight decay for SGD')
-parser.add_argument('--gamma', default=0.1, type=float,                      #config
-                    help='Gamma update for SGD')
 parser.add_argument('--visdom', default=False, type=str2bool,
                     help='Use visdom for loss visualization')
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
 
-#####
-PREPROCESS_MEAN = (104.0, 117.0, 123.0) 
-NN_inputSize = 300
-isDetailLog = False
-#####
-
+######## ###################
+# 
+# train
+# 
+#  ############################
 def train():
     ######## config ########
-    cfg =  config.custom
-    pprint.pprint(cfg)
+    with open("./config.yml", 'r') as ymlfile:
+        cfg = yaml.load(ymlfile)
+        print('\n=========\nconfig \n==========\n')
+        pprint.pprint(cfg)
 
     ######## cuda ########
     if torch.cuda.is_available():
@@ -99,7 +92,7 @@ def train():
         print('Resuming training, loading {}...'.format(args.resume))
         ssd_net.load_weights(args.resume)
     else:
-        vgg_weights = torch.load(args.save_folder + args.basenet)
+        vgg_weights = torch.load(cfg['basenet_checkpt_path'])
         print('Loading base network...')
         ssd_net.vgg.load_state_dict(vgg_weights)
 
@@ -114,9 +107,13 @@ def train():
         ssd_net.conf.apply(weights_init)
 
     ############## load loss function and optimizer ####################
-    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
-                          weight_decay=args.weight_decay)
-    criterion = MultiBoxLoss(cfg, cfg['num_classes'], 0.5, True, 0, True, 3, 0.5,
+    optimizer = optim.SGD(  net.parameters(), 
+                            lr=cfg['initial_lr'],
+                            momentum=cfg['momentum'],
+                            weight_decay=cfg['weight_decay'])
+
+    criterion = MultiBoxLoss(cfg, cfg['num_classes'],
+                             0.5, True, 0, True, 3, 0.5,
                              False, args.cuda)
 
     # loss counters
@@ -126,7 +123,7 @@ def train():
 
     print('Loading the dataset...')
 
-    epoch_size = len(dataset) // args.batch_size
+    epoch_size = len(dataset) // cfg['batch_size']
     print('Training SSD on:', dataset.name)
 
     step_index = 0
@@ -138,8 +135,8 @@ def train():
         epoch_plot = create_vis_plot(viz,'Epoch', 'Loss', vis_title, vis_legend)
 
     ######## dataloader ########
-    data_loader = data.DataLoader(dataset, args.batch_size,
-                                  num_workers=args.num_workers,
+    data_loader = data.DataLoader(dataset, cfg['batch_size'],
+                                  num_workers=cfg['num_workers'],
                                   shuffle=True, collate_fn=detection_collate,
                                   pin_memory=True)
 
@@ -159,7 +156,7 @@ def train():
 
         if iteration in cfg['lr_steps']:
             step_index += 1
-            adjust_learning_rate(optimizer, args.gamma, step_index)
+            adjust_learning_rate(optimizer, cfg['gamma'], step_index)
 
         # load train data
         try:
@@ -173,7 +170,7 @@ def train():
             images = images.cuda()
             targets = [t.cuda() for t in targets] # from a list of tensors to a list of tensor cuda 
 
-        if isDetailLog:
+        if cfg['isDetailLog']:
            # print("images = {}".format(images.type()))
            # print("targets[0] = {}".format(targets[0].type()))
 
@@ -216,7 +213,11 @@ def train():
     torch.save(ssd_net.state_dict(),
                args.save_folder + '' + args.dataset + '.pth')
 
-
+######## ###################
+# 
+# util
+# 
+#  ############################
 def adjust_learning_rate(optimizer, gamma, step):
     """Sets the learning rate to the initial LR decayed by 10 at every
         specified step
@@ -259,6 +260,10 @@ def update_vis_plot(viz, iteration, loc, conf, window, update_type, average_size
             update=update_type
         )
         
-
+######## ###################
+# 
+# main
+# 
+#  ############################
 if __name__ == '__main__':
     train()

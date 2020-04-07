@@ -1,0 +1,27 @@
+---
+### train para ####
+name: 'custom'
+isDetailLog : 0
+max_iter: 8000
+lr_steps: [6000, 8000, 10000]
+batch_size: 1
+num_workers: 0                                          # Number of workers used in dataloading, 0 means only the main thread is used in data loading
+initial_lr: 0.0001
+momentum: 0.9
+weight_decay: 0.0005
+gamma: 0.1
+PREPROCESS_MEAN : [0,0,0]
+
+### network architecture ####
+num_classes: 2      
+basenet_checkpt_path: "./weights/vgg16_reducedfc.pth"
+feature_maps: [38, 19, 10, 5, 3, 1]                     # size of each feature map  (can be changed?)
+min_dim: 300                                            # input image size (can be changed?)
+steps: [8, 16, 32, 64, 100, 300]                        # meaning? (can be changed?)
+min_sizes: [21, 45, 99, 153, 207, 261]
+max_sizes: [45, 99, 153, 207, 261, 315]                 # it control prior box sizes (can be changed?)
+aspect_ratios: [[2], [2, 3], [2, 3], [2, 3], [2], [2]]  # it control prior box aspect ratio (can be changed?)
+variance: [0.1, 0.2]                                    # it does sth in the prior box (can be changed?)
+clip: True                                              # it does sth in the prior box (can be changed?)
+
+...
