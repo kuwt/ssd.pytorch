@@ -158,7 +158,7 @@ def train():
 
         if iteration in cfg['lr_steps']:
             step_index += 1
-            adjust_learning_rate(optimizer, cfg['gamma'], step_index)
+            adjust_learning_rate(cfg['initial_lr'], optimizer, cfg['gamma'], step_index)
 
         # load train data
         try:
@@ -221,13 +221,13 @@ def train():
 # util
 # 
 #  ############################
-def adjust_learning_rate(optimizer, gamma, step):
+def adjust_learning_rate(initial_lr, optimizer, gamma, step):
     """Sets the learning rate to the initial LR decayed by 10 at every
         specified step
     # Adapted from PyTorch Imagenet example:
     # https://github.com/pytorch/examples/blob/master/imagenet/main.py
     """
-    lr = args.lr * (gamma ** (step))
+    lr = initial_lr * (gamma ** (step))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
