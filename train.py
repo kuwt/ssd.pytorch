@@ -31,6 +31,8 @@ parser = argparse.ArgumentParser( description='Single Shot MultiBox Detector Tra
 
 train_set = parser.add_mutually_exclusive_group()
 
+parser.add_argument('--cfg', default="./config.yml", type=str,
+                    help='cfg specify network architecture and training parameter')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,        
@@ -50,7 +52,7 @@ args = parser.parse_args()
 #  ############################
 def train():
     ######## config ########
-    with open("./config.yml", 'r') as ymlfile:
+    with open(args.cfg, 'r') as ymlfile:
         cfg = yaml.load(ymlfile)
         print('\n=========\nconfig \n==========\n')
         pprint.pprint(cfg)

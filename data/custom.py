@@ -105,7 +105,7 @@ class CustomDetection(data.Dataset):
             targets += [bndbox]  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
         #print("targets = ", targets)
-        
+
         ##### resize to map input resolution of the network#####
         img =  cv2.resize(img, (self.input_res, self.input_res), interpolation = cv2.INTER_AREA)
         
@@ -141,11 +141,11 @@ class CustomDetection(data.Dataset):
         img = image_aug
 
         ##### treatment for SSD multibox #####
-        for t in targets:
-            t[0] = float(t[0]) /float(width)
-            t[1] = float(t[1]) / float(height)
-            t[2] = float(t[2]) / float(width)
-            t[3] = float(t[3]) / float(height)
+        for t in targets: # from absolute coordinate to ratio coordinate respect to input size
+            t[0] = float(t[0]) / (self.input_res)
+            t[1] = float(t[1]) / (self.input_res)
+            t[2] = float(t[2]) / (self.input_res)
+            t[3] = float(t[3]) / (self.input_res)
         img = img.astype('float32') 
 
         return torch.from_numpy(img).permute(2, 0, 1), targets, height, width
