@@ -5,7 +5,7 @@ import torch
 import torch.utils.data as data
 import cv2
 import numpy as np
-import xml.etree.ElementTree as ET
+import json
 import imgaug as ia
 import imgaug.augmenters as iaa
 from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
@@ -15,10 +15,10 @@ if sys.version_info[0] == 2:
 else:
     import xml.etree.ElementTree as ET
 
-THE_CLASSES = ('1', )
-DATA_ROOT = '/srv/storage/kuwingto/dataset/sae20200224/obj1_bbox'
+THE_CLASSES = ('box', )
+DATA_ROOT = '/srv/data/kuwingto/SAEcustomData20200224/obj1_bbox'
 
-def transverseImageAnnoDirectory(root, img_ext, anno_ext):
+def transverseImageAnnoDirectory(root, img_ext = ".bmp", anno_ext = ".json"):
     """
     transverse the root directory and return the image paths and annotation as lists.
     """
@@ -55,7 +55,7 @@ class CustomDetection(data.Dataset):
         self.name = dataset_name
         self.input_res = cfg['min_dim']
         self.class_to_ind = dict(zip(THE_CLASSES, range(len(THE_CLASSES))))
-        self._imgpaths, self._annopaths = transverseImageAnnoDirectory(self.root, ".bmp", ".xml")
+        self._imgpaths, self._annopaths = transverseImageAnnoDirectory(self.root, ".bmp", ".json")
     
         print("show 5 samples")
         for i in range(5):
@@ -81,31 +81,25 @@ class CustomDetection(data.Dataset):
         height, width, channels = img.shape
 
         annofile = open(anno_path, 'r')
-        tree = ET.parse(annofile)
+        jsonanno = json.load(annofile)
 
+        ##### read files #####
         targets = [] 
-        root = tree.getroot()
-        for object in root.iter('object'):
-            ymin, xmin, ymax, xmax = None, None, None, None
-            bbox = object.find("bndbox")
-            ymin = int(bbox.find("ymin").text)
-            xmin = int(bbox.find("xmin").text)
-            ymax = int(bbox.find("ymax").text)
-            xmax = int(bbox.find("xmax").text)
+        for obj in jsonanno['shapes']:
+            name = obj['label']
+            x = [obj['points'][0][0], obj['points'][1][0]]
+            y = [obj['points'][0][1], obj['points'][1][1]]
 
-            name = object.find("name").text
             bndbox = []
-            bndbox.append(xmin)
-            bndbox.append(ymin)
-            bndbox.append(xmax)
-            bndbox.append(ymax)
+            bndbox.append(min(x))
+            bndbox.append(min(y))
+            bndbox.append(max(x))
+            bndbox.append(max(y))
 
             label_idx = self.class_to_ind[name]
-            bndbox.append(label_idx)  # [xmin, ymin, xmax, ymax, label_ind]
+            bndbox.append(label_idx)    # [xmin, ymin, xmax, ymax, label_ind]
             targets += [bndbox]  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
-        #print("targets = ", targets)
-        
         ##### resize to map input resolution of the network#####
         img =  cv2.resize(img, (self.input_res, self.input_res), interpolation = cv2.INTER_AREA)
         
