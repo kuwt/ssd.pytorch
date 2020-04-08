@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 from layers import *
 import os
 
@@ -61,7 +60,7 @@ class SSD(nn.Module):
         Return:
             Depending on phase:
             test:
-                Variable(tensor) of output class label predictions,
+                tensor of output class label predictions,
                 confidence score, and corresponding location predictions for
                 each object detected. Shape: [batch,topk,7]
 

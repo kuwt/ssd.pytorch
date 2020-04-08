@@ -5,7 +5,6 @@ import cv2
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
 from matplotlib import pyplot as plt
 import argparse
 import pprint
@@ -50,7 +49,7 @@ def demo(cfg, imgPath, checkpt):
     image = cv2.imread(imgPath, cv2.IMREAD_COLOR)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
   
-    for iter in range(5):
+    for iter in range(1):
         start = time.time()
         ##### Pre-process the input #####
         x = cv2.resize(image, (cfg['min_dim'], cfg['min_dim'])).astype(np.float32)
@@ -61,7 +60,7 @@ def demo(cfg, imgPath, checkpt):
         x = torch.from_numpy(x).permute(2, 0, 1)
 
         ##### SSD Forward Pass #####
-        xx = Variable(x.unsqueeze(0))     # add dimension to x to match network input, wrap tensor in Variable
+        xx = x.unsqueeze(0)     # add dimension to x to match network input
         
         if args.cuda:
             if torch.cuda.is_available():
