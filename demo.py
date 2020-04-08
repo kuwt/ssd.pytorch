@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 import argparse
 import pprint
 import yaml
+import time
 
 from ssd import build_ssd
 
@@ -49,27 +50,28 @@ def demo(cfg, imgPath, checkpt):
     image = cv2.imread(imgPath, cv2.IMREAD_COLOR)
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
   
-    ##### Pre-process the input #####
-    x = cv2.resize(image, (cfg['min_dim'], cfg['min_dim'])).astype(np.float32)
+    for iter in range(5):
+        start = time.time()
+        ##### Pre-process the input #####
+        x = cv2.resize(image, (cfg['min_dim'], cfg['min_dim'])).astype(np.float32)
+        PREPROCESS_MEAN = cfg['PREPROCESS_MEAN']
+        x -= PREPROCESS_MEAN   #subtract mean of the dataset as in the training phase
+        x = x.astype(np.float32)
+        x = x[:, :, ::-1].copy()
+        x = torch.from_numpy(x).permute(2, 0, 1)
 
-    PREPROCESS_MEAN = cfg['PREPROCESS_MEAN']
-    x -= PREPROCESS_MEAN   #subtract mean of the dataset as in the training phase
-    x = x.astype(np.float32)
-    x = x[:, :, ::-1].copy()
-    x = torch.from_numpy(x).permute(2, 0, 1)
+        ##### SSD Forward Pass #####
+        xx = Variable(x.unsqueeze(0))     # add dimension to x to match network input, wrap tensor in Variable
+        
+        if args.cuda:
+            if torch.cuda.is_available():
+                xx = xx.cuda()
+        y = net(xx)
 
-    ##### SSD Forward Pass #####
-    xx = Variable(x.unsqueeze(0))     # add dimension to x to match network input, wrap tensor in Variable
-    
-    if args.cuda:
-        if torch.cuda.is_available():
-            xx = xx.cuda()
-    y = net(xx)
-    print('y = ', y.shape)
-    ##### Parse the Detections and View Results #####
-    detections = y.data
-    print('detections = ', detections.shape)
-
+        ##### Parse the Detections and View Results #####
+        detections = y.data
+        end = time.time()
+        print('inference time = {}s'.format(end - start))
 
     # scale each detection back up to the image
     scale = torch.Tensor(rgb_image.shape[1::-1]).repeat(2)
